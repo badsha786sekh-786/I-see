@@ -70,13 +70,17 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: TEXT, lang: LANG })
       });
-      if (!res.ok) throw new Error("HTTP " + res.status);
+      if (!res.ok) {
+        let detail = "";
+        try { detail = (await res.json()).error || ""; } catch {}
+        throw new Error("HTTP " + res.status + (detail ? " - " + detail : ""));
+      }
       const blob = await res.blob();
       const audio = new Audio(URL.createObjectURL(blob));
       await audio.play();
       statusEl.textContent = "";
     } catch (e) {
-      statusEl.textContent = "Worker voice failed (page must be hosted on an allowed site). Using browser voice.";
+      statusEl.textContent = "Error: " + e.message + " | page origin: " + location.origin + " | using browser voice.";
       browserVoice();
     }
   }
