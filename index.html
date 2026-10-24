@@ -49,8 +49,7 @@
   // ---- Settings ----
   const TEXT = "welcome and i see you";
   const TTS_URL = "https://anime.badsha90sekh.workers.dev/";
-  // If your TTS API uses a different parameter name (e.g. "q" or "message"), change it here:
-  const TEXT_PARAM = "text";
+  const LANG = "en"; // Worker accepts: "hi", "en", "bn"
 
   const statusEl = document.getElementById("status");
   const btn = document.getElementById("btn");
@@ -66,23 +65,18 @@
   async function speak() {
     statusEl.textContent = "Loading voice…";
     try {
-      const url = TTS_URL + (TTS_URL.includes("?") ? "&" : "?") + TEXT_PARAM + "=" + encodeURIComponent(TEXT);
-      const res = await fetch(url);
+      const res = await fetch(TTS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: TEXT, lang: LANG })
+      });
       if (!res.ok) throw new Error("HTTP " + res.status);
-      const type = res.headers.get("content-type") || "";
-      let src;
-      if (type.includes("json")) {
-        const data = await res.json();
-        src = data.url || data.audio || data.audio_url || data.link;
-        if (!src) throw new Error("No audio link in response");
-      } else {
-        src = URL.createObjectURL(await res.blob());
-      }
-      const audio = new Audio(src);
+      const blob = await res.blob();
+      const audio = new Audio(URL.createObjectURL(blob));
       await audio.play();
       statusEl.textContent = "";
     } catch (e) {
-      statusEl.textContent = "TTS URL did not respond, using browser voice.";
+      statusEl.textContent = "Worker voice failed (page must be hosted on an allowed site). Using browser voice.";
       browserVoice();
     }
   }
