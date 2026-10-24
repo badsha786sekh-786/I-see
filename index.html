@@ -13,11 +13,14 @@
     color: var(--ink);
     font-family: "Trebuchet MS", "Segoe UI", sans-serif;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 20px; padding: 24px; text-align: center; overflow-x: hidden;
+    gap: 28px; padding: 24px; text-align: center; overflow: hidden;
   }
-  .eye { width: min(40vw, 160px); filter: drop-shadow(0 0 22px var(--glow)); }
-  .pupil { transition: transform .12s ease-out; }
-  h1 { font-size: clamp(1.8rem, 7vw, 3.4rem); font-weight: 800; text-shadow: 0 0 18px var(--glow); }
+  .eye { width: min(60vw, 240px); filter: drop-shadow(0 0 22px var(--glow)); }
+  .pupil { transition: transform .22s cubic-bezier(.2,.8,.2,1); }
+  h1 {
+    font-size: clamp(1.8rem, 7vw, 3.4rem); font-weight: 800; letter-spacing: .02em;
+    text-shadow: 0 0 18px var(--glow);
+  }
   .dog { width: min(70vw, 300px); border-radius: 18px; box-shadow: 0 0 28px rgba(124,92,255,.6); }
   .bday { font-size: clamp(1.4rem, 6vw, 2.4rem); color: #ffd84d; text-shadow: 0 0 16px rgba(255,216,77,.6); }
   button {
@@ -27,37 +30,58 @@
   }
   button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
   #status { min-height: 1.2em; font-size: .9rem; opacity: .7; }
+  html, body { touch-action: none; }
+  .mouth { width: min(34vw, 130px); margin-top: -10px; filter: drop-shadow(0 0 12px var(--glow)); overflow: visible; }
+  #mouthMove { transition: transform .22s cubic-bezier(.2,.8,.2,1); }
+  #mouthOpen { transform-box: fill-box; transform-origin: 50% 0%; transform: scaleY(.04); opacity: 0; transition: transform .12s ease-out, opacity .08s; }
+  #mouthOpen.open { transform: scaleY(1); opacity: 1; }
+  #mouthOpen.talk { opacity: 1; animation: talk .26s ease-in-out infinite alternate; }
+  @keyframes talk { from { transform: scaleY(.15); } to { transform: scaleY(1); } }
+  @media (prefers-reduced-motion: reduce) { #mouthOpen.talk { opacity: 1; animation: none; transform: scaleY(.6); } }
 </style>
 </head>
 <body>
-  <svg class="eye" viewBox="0 0 200 110" aria-hidden="true">
+  <svg class="eye" id="eye" viewBox="0 0 200 110" aria-hidden="true">
+    <defs><clipPath id="eyeShape"><path d="M5 55 Q100 -15 195 55 Q100 125 5 55 Z"/></clipPath></defs>
     <path d="M5 55 Q100 -15 195 55 Q100 125 5 55 Z" fill="#fff"/>
-    <g class="pupil" id="pupil">
-      <circle cx="100" cy="55" r="34" fill="var(--iris)"/>
-      <circle cx="100" cy="55" r="16" fill="#12081f"/>
-      <circle cx="90" cy="45" r="6" fill="#fff"/>
+    <g clip-path="url(#eyeShape)">
+      <g class="pupil" id="pupil">
+        <circle id="irisRing" cx="100" cy="55" r="34" fill="var(--iris)"/>
+        <circle cx="100" cy="55" r="16" fill="#12081f"/>
+        <circle cx="90" cy="45" r="6" fill="#fff"/>
+      </g>
     </g>
     <path d="M5 55 Q100 -15 195 55" fill="none" stroke="#12081f" stroke-width="5"/>
   </svg>
 
+  <svg class="mouth" id="mouth" viewBox="0 0 120 70" aria-hidden="true">
+    <g id="mouthMove">
+      <path id="mouthOpen" d="M14 14 Q60 34 106 14 Q100 62 60 64 Q20 62 14 14 Z" fill="#8a0018" stroke="#ff7aa8" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M14 14 Q60 34 106 14" fill="none" stroke="#ff7aa8" stroke-width="5" stroke-linecap="round"/>
+    </g>
+  </svg>
+
   <video class="dog" src="birthday.mp4" autoplay muted loop playsinline></video>
-  <h1>welcome and i see you</h1>
+  <h1 id="msg">welcome and i see you</h1>
   <h2 class="bday">Happy Birthday bro! 🎂🎉</h2>
   <button id="btn">Tap to hear</button>
   <p id="status"></p>
 
 <script>
+  // ---- Settings ----
   const TEXT = "welcome and i see you. Happy birthday bro!";
   const TTS_URL = "https://anime.badsha90sekh.workers.dev/";
-  const LANG = "en"; // "hi", "en", "bn"
+  const LANG = "en"; // Worker accepts: "hi", "en", "bn"
 
   const statusEl = document.getElementById("status");
+  const btn = document.getElementById("btn");
 
   function browserVoice() {
-    if (!("speechSynthesis" in window)) return;
+    if (!("speechSynthesis" in window)) { statusEl.textContent = "Voice not supported in this browser."; return; }
     speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(TEXT);
     u.rate = 0.9; u.pitch = 1.2;
+    u.onstart = () => setTalking(true); u.onend = u.onerror = () => setTalking(false);
     speechSynthesis.speak(u);
   }
 
@@ -75,7 +99,10 @@
         throw new Error("HTTP " + res.status + (detail ? " - " + detail : ""));
       }
       const blob = await res.blob();
-      await new Audio(URL.createObjectURL(blob)).play();
+      const audio = new Audio(URL.createObjectURL(blob));
+      audio.onplay = () => setTalking(true);
+      audio.onended = audio.onpause = () => setTalking(false);
+      await audio.play();
       statusEl.textContent = "";
     } catch (e) {
       statusEl.textContent = "Error: " + e.message + " | page origin: " + location.origin + " | using browser voice.";
@@ -83,14 +110,40 @@
     }
   }
 
-  document.getElementById("btn").addEventListener("click", speak);
+  btn.addEventListener("click", speak);
 
+  // Eye follows the pointer
   const pupil = document.getElementById("pupil");
+  const eye = document.getElementById("eye");
+  const ring = document.getElementById("irisRing");
+  const mouthMove = document.getElementById("mouthMove");
+  const mouthOpen = document.getElementById("mouthOpen");
+  const mouthEl = document.getElementById("mouth");
+
+  // Eye AND mouth follow the finger/mouse continuously: no tap-and-hold, no stopping
   function look(x, y) {
-    pupil.style.transform = `translate(${(x / innerWidth - 0.5) * 36}px, ${(y / innerHeight - 0.5) * 18}px)`;
+    const r = eye.getBoundingClientRect();
+    let dx = x - (r.left + r.width / 2), dy = y - (r.top + r.height / 2);
+    const d = Math.hypot(dx, dy) || 1;
+    const k = Math.min(1, d / 160);
+    pupil.style.transform = `translate(${(dx / d) * 30 * k}px, ${(dy / d) * 13 * k}px)`;
+
+    const m = mouthEl.getBoundingClientRect();
+    let mx = x - (m.left + m.width / 2), my = y - (m.top + m.height / 2);
+    const md = Math.hypot(mx, my) || 1, mk = Math.min(1, md / 200);
+    const tilt = Math.max(-8, Math.min(8, mx / 25));
+    mouthMove.style.transform = `translate(${(mx / md) * 10 * mk}px, ${(my / md) * 5 * mk}px) rotate(${tilt}deg)`;
   }
+  function ping() {
+    ring.classList.remove("ping"); void ring.getBoundingClientRect(); ring.classList.add("ping");
+    mouthOpen.classList.add("open"); setTimeout(() => mouthOpen.classList.remove("open"), 300);
+  }
+  function setTalking(on) { mouthOpen.classList.toggle("talk", on); }
+
+  addEventListener("pointerdown", e => { look(e.clientX, e.clientY); ping(); });
   addEventListener("pointermove", e => look(e.clientX, e.clientY));
-  addEventListener("touchmove", e => look(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+  addEventListener("touchstart", e => look(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+  addEventListener("touchmove",  e => look(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
 </script>
 </body>
 </html>
