@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Welcome</title>
+<style>
+  :root { --bg:#12081f; --ink:#f6eefc; --glow:#ff3d8b; --iris:#7c5cff; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: radial-gradient(circle at 50% 35%, #2a1250 0%, var(--bg) 65%);
+    color: var(--ink);
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 28px; padding: 24px; text-align: center; overflow: hidden;
+  }
+  .eye { width: min(60vw, 240px); filter: drop-shadow(0 0 22px var(--glow)); }
+  .pupil { transition: transform .12s ease-out; }
+  h1 {
+    font-size: clamp(1.8rem, 7vw, 3.4rem); font-weight: 800; letter-spacing: .02em;
+    text-shadow: 0 0 18px var(--glow);
+  }
+  button {
+    background: var(--glow); color: #fff; border: 0; border-radius: 999px;
+    padding: 14px 34px; font-size: 1.05rem; font-weight: 700; cursor: pointer;
+    box-shadow: 0 0 24px rgba(255,61,139,.6);
+  }
+  button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  #status { min-height: 1.2em; font-size: .9rem; opacity: .7; }
+</style>
+</head>
+<body>
+  <svg class="eye" viewBox="0 0 200 110" aria-hidden="true">
+    <path d="M5 55 Q100 -15 195 55 Q100 125 5 55 Z" fill="#fff"/>
+    <g class="pupil" id="pupil">
+      <circle cx="100" cy="55" r="34" fill="var(--iris)"/>
+      <circle cx="100" cy="55" r="16" fill="#12081f"/>
+      <circle cx="90" cy="45" r="6" fill="#fff"/>
+    </g>
+    <path d="M5 55 Q100 -15 195 55" fill="none" stroke="#12081f" stroke-width="5"/>
+  </svg>
+
+  <h1 id="msg">welcome and i see you</h1>
+  <button id="btn">Tap to hear</button>
+  <p id="status"></p>
+
+<script>
+  // ---- Settings ----
+  const TEXT = "welcome and i see you";
+  const TTS_URL = "https://anime.badsha90sekh.workers.dev/";
+  // If your TTS API uses a different parameter name (e.g. "q" or "message"), change it here:
+  const TEXT_PARAM = "text";
+
+  const statusEl = document.getElementById("status");
+  const btn = document.getElementById("btn");
+
+  function browserVoice() {
+    if (!("speechSynthesis" in window)) { statusEl.textContent = "Voice not supported in this browser."; return; }
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(TEXT);
+    u.rate = 0.9; u.pitch = 1.2;
+    speechSynthesis.speak(u);
+  }
+
+  async function speak() {
+    statusEl.textContent = "Loading voice…";
+    try {
+      const url = TTS_URL + (TTS_URL.includes("?") ? "&" : "?") + TEXT_PARAM + "=" + encodeURIComponent(TEXT);
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const type = res.headers.get("content-type") || "";
+      let src;
+      if (type.includes("json")) {
+        const data = await res.json();
+        src = data.url || data.audio || data.audio_url || data.link;
+        if (!src) throw new Error("No audio link in response");
+      } else {
+        src = URL.createObjectURL(await res.blob());
+      }
+      const audio = new Audio(src);
+      await audio.play();
+      statusEl.textContent = "";
+    } catch (e) {
+      statusEl.textContent = "TTS URL did not respond, using browser voice.";
+      browserVoice();
+    }
+  }
+
+  btn.addEventListener("click", speak);
+
+  // Eye follows the pointer
+  const pupil = document.getElementById("pupil");
+  function look(x, y) {
+    const dx = (x / innerWidth - 0.5) * 36;
+    const dy = (y / innerHeight - 0.5) * 18;
+    pupil.style.transform = `translate(${dx}px, ${dy}px)`;
+  }
+  addEventListener("pointermove", e => look(e.clientX, e.clientY));
+  addEventListener("touchmove", e => look(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+</script>
+</body>
+</html>
